@@ -1,10 +1,7 @@
-import SignOutBtn from "@/components/navigation/signout-btn";
-
 const CalendarPage = () => {
   return (
-    <div>
+    <div className="p-6">
       <p>Calendar Page</p>
-      <SignOutBtn />
     </div>
   );
 };

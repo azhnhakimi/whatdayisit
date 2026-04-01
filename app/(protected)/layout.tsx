@@ -4,6 +4,9 @@ import { useEffect, useState, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/navigation/app-sidebar";
+
 interface ProtectedLayoutProps {
   children: ReactNode;
 }
@@ -30,11 +33,19 @@ export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p>Loading...</p>
-      </div>
+      <SidebarProvider>
+        <AppSidebar />
+        <div className="flex items-start justify-start min-h-screen h-full w-full p-6">
+          <p>Loading...</p>
+        </div>
+      </SidebarProvider>
     );
   }
 
-  return <>{children}</>;
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+      {children}
+    </SidebarProvider>
+  );
 }
