@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -74,7 +75,7 @@ const SignupForm = () => {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto mt-20">
+    <Card className="w-full max-w-sm mx-auto mt-20 py-8">
       <CardHeader>
         <CardTitle>Create your account</CardTitle>
         <CardDescription>
@@ -84,7 +85,7 @@ const SignupForm = () => {
 
       <CardContent className="space-y-4">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="username">Username</Label>
             <Input
               id="username"
@@ -95,7 +96,7 @@ const SignupForm = () => {
             />
           </div>
 
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
@@ -107,7 +108,7 @@ const SignupForm = () => {
             />
           </div>
 
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"
@@ -121,9 +122,16 @@ const SignupForm = () => {
 
           {error && <p className="text-sm text-red-500">{error}</p>}
 
-          <Button onClick={handleSignup} disabled={loading}>
+          <Button onClick={handleSignup} disabled={loading} className="py-5">
             {loading ? "Creating..." : "Create Account"}
           </Button>
+
+          <p>
+            Already have an account?{" "}
+            <span>
+              <Link href="/login">Login</Link>
+            </span>
+          </p>
         </div>
       </CardContent>
     </Card>

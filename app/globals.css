@@ -124,7 +124,8 @@
   body {
     @apply bg-background text-foreground;
   }
-  html {
-    @apply font-sans;
+  html,
+  body {
+    font-family: var(--font-space-grotesk), ui-sans-serif, system-ui;
   }
 }

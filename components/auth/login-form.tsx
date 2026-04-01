@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -50,48 +51,57 @@ const LoginForm = () => {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto mt-20">
-      <CardHeader>
-        <CardTitle>Log in to your account</CardTitle>
-        <CardDescription>
-          Enter your email and password to access your account.
-        </CardDescription>
-      </CardHeader>
+    <>
+      <Card className="w-full max-w-sm mx-auto mt-20 py-8">
+        <CardHeader>
+          <CardTitle>Log in to your account</CardTitle>
+          <CardDescription>
+            Enter your email and password to access your account.
+          </CardDescription>
+        </CardHeader>
 
-      <CardContent className="space-y-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="********"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+
+            {error && <p className="text-sm text-red-500">{error}</p>}
+
+            <Button onClick={handleLogin} disabled={loading} className="py-5">
+              {loading ? "Logging in..." : "Log In"}
+            </Button>
+
+            <p>
+              Don't have an account?{" "}
+              <span>
+                <Link href="/signup">Signup</Link>
+              </span>
+            </p>
           </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="********"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
-
-          <Button onClick={handleLogin} disabled={loading}>
-            {loading ? "Logging in..." : "Log In"}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </>
   );
 };
 
