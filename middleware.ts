@@ -7,7 +7,7 @@ export async function middleware(req: NextRequest) {
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
     {
       cookies: {
         getAll: () => req.cookies.getAll(),
@@ -24,7 +24,7 @@ export async function middleware(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isProtected = req.nextUrl.pathname.startsWith("/module");
+  const isProtected = req.nextUrl.pathname.startsWith("/modules");
 
   if (isProtected && !user) {
     return NextResponse.redirect(new URL("/login", req.url));
@@ -34,12 +34,12 @@ export async function middleware(req: NextRequest) {
     (req.nextUrl.pathname === "/login" || req.nextUrl.pathname === "/signup") &&
     user
   ) {
-    return NextResponse.redirect(new URL("/module", req.url));
+    return NextResponse.redirect(new URL("/modules/calendar", req.url));
   }
 
   return res;
 }
 
 export const config = {
-  matcher: ["/module/:path*", "/login", "/signup"],
+  matcher: ["/modules/:path*", "/login", "/signup"],
 };
