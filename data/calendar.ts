@@ -1,10 +1,23 @@
+import { rrulestr } from "rrule";
+
 export type CalendarEvent = {
   id: string;
+  user_id: string;
+  category_id: string | null;
+  categories?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
   title: string;
-  date: string;
-  startTime?: string;
-  endTime?: string;
-  color?: string;
+  description: string | null;
+  start_time: string;
+  end_time: string;
+  is_recurring: boolean;
+  recurrence_rule: string | null;
+  recurrence_start_date: string | null;
+  recurrence_end_date: string | null;
+  created_at: string;
 };
 
 export const MONTH_NAMES = [
@@ -76,75 +89,45 @@ export function getMonthGrid(year: number, month: number): (Date | null)[][] {
   return weeks;
 }
 
-export const MOCK_CALENDAR_EVENTS: CalendarEvent[] = [
-  {
-    id: "1",
-    title: "Team Standup",
-    date: getTodayStr(),
-    startTime: "09:00",
-    endTime: "09:30",
-  },
-  {
-    id: "2",
-    title: "Design Review",
-    date: getTodayStr(),
-    startTime: "11:00",
-    endTime: "12:00",
-  },
-  {
-    id: "3",
-    title: "Lunch w/ Sarah",
-    date: getTodayStr(),
-    startTime: "12:30",
-    endTime: "13:30",
-  },
-  {
-    id: "4",
-    title: "Sprint Planning",
-    date: getOffsetDateStr(1),
-    startTime: "10:00",
-    endTime: "11:30",
-  },
-  {
-    id: "5",
-    title: "1:1 with Manager",
-    date: getOffsetDateStr(1),
-    startTime: "15:00",
-    endTime: "15:30",
-  },
-  {
-    id: "6",
-    title: "Product Demo",
-    date: getOffsetDateStr(2),
-    startTime: "14:00",
-    endTime: "15:00",
-  },
-  {
-    id: "7",
-    title: "All Hands",
-    date: getOffsetDateStr(-1),
-    startTime: "09:00",
-    endTime: "10:00",
-  },
-  {
-    id: "8",
-    title: "Retrospective",
-    date: getOffsetDateStr(3),
-    startTime: "16:00",
-    endTime: "17:00",
-  },
-  {
-    id: "9",
-    title: "Client Call",
-    date: getOffsetDateStr(3),
-    startTime: "11:00",
-    endTime: "11:45",
-  },
-  {
-    id: "10",
-    title: "Workshop",
-    date: getOffsetDateStr(-2),
-    startTime: "13:00",
-    endTime: "17:00",
-  },
-];
+export function expandEventInRange(
+  event: CalendarEvent,
+  rangeStart: Date,
+  rangeEnd: Date,
+): CalendarEvent[] {
+  if (!event.start_time) return [];
+
+  if (!event.is_recurring || !event.recurrence_rule) {
+    const start = new Date(event.start_time);
+
+    if (start >= rangeStart && start <= rangeEnd) {
+      return [event];
+    }
+
+    return [];
+  }
+
+  try {
+    const dtstart = new Date(event.start_time)
+      .toISOString()
+      .replace(/[-:]|\.\d{3}/g, "");
+
+    const fullRule = `DTSTART:${dtstart}\n${event.recurrence_rule}`;
+
+    const rule = rrulestr(fullRule);
+
+    const dates = rule.between(rangeStart, rangeEnd, true);
+
+    const originalStart = new Date(event.start_time);
+    const originalEnd = new Date(event.end_time);
+    const duration = originalEnd.getTime() - originalStart.getTime();
+
+    return dates.map((date) => ({
+      ...event,
+      start_time: new Date(date).toISOString(),
+      end_time: new Date(date.getTime() + duration).toISOString(),
+    }));
+  } catch (err) {
+    console.error("Failed to parse recurrence rule:", err);
+    return [];
+  }
+}

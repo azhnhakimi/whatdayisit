@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createClient } from "@/utils/supabase/client";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 import {
@@ -9,12 +10,13 @@ import {
   parseTime,
   getWeekDates,
   getMonthGrid,
-  MOCK_CALENDAR_EVENTS,
   MONTH_NAMES,
   DAY_NAMES_SHORT,
   HOURS,
+  expandEventInRange,
 } from "@/data/calendar";
-import { Drawer, DrawerTrigger } from "@/components/ui/drawer";
+import MonthView from "@/components/month-view";
+import WeekView from "@/components/week-view";
 import EventCreationDrawer from "@/components/drawer/event-creation-drawer";
 
 type ViewMode = "month" | "week";
@@ -30,11 +32,88 @@ function onEventClick(event: CalendarEvent) {
 }
 
 const AppCalendar = () => {
+  const supabase = createClient();
+
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const today = new Date();
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [anchor, setAnchor] = useState<Date>(new Date(today));
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const weekScrollRef = useRef<HTMLDivElement>(null);
+
+  const fetchEvents = async () => {
+    setLoading(true);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      console.error("Failed to get user:", userError);
+      setLoading(false);
+      return;
+    }
+
+    let start: Date;
+    let end: Date;
+
+    if (viewMode === "month") {
+      const grid = getMonthGrid(anchor.getFullYear(), anchor.getMonth());
+      const flat = grid.flat().filter((d): d is Date => d !== null);
+      start = flat[0];
+      end = flat[flat.length - 1];
+    } else {
+      const week = getWeekDates(anchor);
+      start = week[0];
+      end = week[6];
+    }
+
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
+    const nonRecurringFilter = `and(is_recurring.eq.false,start_time.gte.${start.toISOString()},start_time.lte.${end.toISOString()})`;
+
+    const recurringFilter = `and(is_recurring.eq.true,or(recurrence_end_date.is.null,recurrence_end_date.gte.${start.toISOString()}))`;
+
+    const { data, error } = await supabase
+      .from("events")
+      .select(
+        `
+    *,
+    categories (
+      id,
+      name,
+      color
+    )
+  `,
+      )
+      .eq("user_id", user.id)
+      .or(`${nonRecurringFilter},${recurringFilter}`);
+
+    if (error) {
+      console.error(error);
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
+
+    if (data) {
+      const expanded = data.flatMap((event) =>
+        expandEventInRange(event, start, end),
+      );
+
+      setEvents(expanded);
+    }
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchEvents();
+  }, [anchor, viewMode]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -69,9 +148,17 @@ const AppCalendar = () => {
 
   const todayStr = toDateStr(today);
 
-  const getEventsForDate = useCallback((dateStr: string) => {
-    return MOCK_CALENDAR_EVENTS.filter((e) => e.date === dateStr);
-  }, []);
+  const getEventsForDate = useCallback(
+    (dateStr: string) => {
+      return events.filter((e) => {
+        if (!e.start_time) return false;
+
+        const eventDate = new Date(e.start_time);
+        return toDateStr(eventDate) === dateStr;
+      });
+    },
+    [events],
+  );
 
   const headerLabel = () => {
     if (viewMode === "month") {
@@ -149,19 +236,8 @@ const AppCalendar = () => {
             </button>
           </div>
 
-          <EventCreationDrawer />
+          <EventCreationDrawer onEventCreated={fetchEvents} />
         </div>
-      </div>
-
-      <div className="grid grid-cols-7 border-b border-[#e2e2de]">
-        {DAY_NAMES_SHORT.map((d) => (
-          <div
-            key={d}
-            className="py-2 text-center text-[10px] font-semibold tracking-widest uppercase text-[#888]"
-          >
-            {d}
-          </div>
-        ))}
       </div>
 
       {viewMode === "month" ? (
@@ -169,6 +245,8 @@ const AppCalendar = () => {
           anchor={anchor}
           todayStr={todayStr}
           getEventsForDate={getEventsForDate}
+          onDayClick={onDayClick}
+          onEventClick={onEventClick}
         />
       ) : (
         <WeekView
@@ -177,212 +255,9 @@ const AppCalendar = () => {
           currentTime={currentTime}
           getEventsForDate={getEventsForDate}
           scrollRef={weekScrollRef}
+          onEventClick={onEventClick}
         />
       )}
-    </div>
-  );
-};
-
-interface MonthViewProps {
-  anchor: Date;
-  todayStr: string;
-  getEventsForDate: (d: string) => CalendarEvent[];
-}
-
-const MonthView = ({ anchor, todayStr, getEventsForDate }: MonthViewProps) => {
-  const grid = getMonthGrid(anchor.getFullYear(), anchor.getMonth());
-
-  return (
-    <div className="flex-1 overflow-auto cal-scroll">
-      {grid.map((week, wi) => (
-        <div key={wi} className="grid grid-cols-7">
-          {week.map((date, di) => {
-            if (!date) {
-              return (
-                <div
-                  key={di}
-                  className="relative border-b border-r border-[#e2e2de] bg-[#f5f5f2]"
-                >
-                  <div style={{ paddingBottom: "100%" }} />
-                </div>
-              );
-            }
-            const ds = toDateStr(date);
-            const events = getEventsForDate(ds);
-            const isToday = ds === todayStr;
-            const isCurrentMonth = date.getMonth() === anchor.getMonth();
-
-            return (
-              <div
-                key={di}
-                className="day-cell relative border-b border-r border-[#e2e2de] cursor-pointer transition-colors duration-100"
-                style={{ background: isToday ? "#f0f0ec" : undefined }}
-                onClick={() => onDayClick(date)}
-              >
-                <div style={{ paddingBottom: "100%" }} />
-                <div className="absolute inset-0 p-1.5 flex flex-col gap-1">
-                  <div className="flex justify-end">
-                    <span
-                      className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full transition-all ${
-                        isToday
-                          ? "bg-[#121212] text-[#f9f9f7]"
-                          : isCurrentMonth
-                            ? "text-[#121212]"
-                            : "text-[#bbb]"
-                      }`}
-                    >
-                      {date.getDate()}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-0.5 overflow-hidden">
-                    {events.slice(0, 3).map((ev) => (
-                      <button
-                        key={ev.id}
-                        className="event-badge w-full text-left px-1.5 py-2 rounded text-[10px] font-medium bg-[#121212] text-[#f9f9f7] truncate transition-all cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onEventClick(ev);
-                        }}
-                      >
-                        {ev.title}
-                      </button>
-                    ))}
-                    {events.length > 3 && (
-                      <span className="text-[9px] text-[#888] pl-1">
-                        +{events.length - 3} more
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
-};
-
-interface WeekViewProps {
-  anchor: Date;
-  todayStr: string;
-  currentTime: Date;
-  getEventsForDate: (d: string) => CalendarEvent[];
-  scrollRef: React.RefObject<HTMLDivElement | null>;
-}
-
-const HOUR_HEIGHT = 64;
-
-const WeekView = ({
-  anchor,
-  todayStr,
-  currentTime,
-  getEventsForDate,
-  scrollRef,
-}: WeekViewProps) => {
-  const weekDates = getWeekDates(anchor);
-  const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-  const nowTop = (nowMinutes / (24 * 60)) * (HOUR_HEIGHT * 24);
-
-  return (
-    <div ref={scrollRef} className="flex-1 overflow-auto cal-scroll">
-      <div className="flex" style={{ minWidth: 0 }}>
-        {/* Time gutter */}
-        <div className="shrink-0 w-14 border-r border-[#e2e2de] relative">
-          {HOURS.map((h) => (
-            <div
-              key={h}
-              className="border-b border-[#e2e2de] flex items-start justify-end pr-2"
-              style={{ height: `${HOUR_HEIGHT}px` }}
-            >
-              {h > 0 && (
-                <span className="text-[10px] text-[#aaa] -mt-2.5">
-                  {h < 12 ? `${h}am` : h === 12 ? "12pm" : `${h - 12}pm`}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Day columns */}
-        {weekDates.map((date, di) => {
-          const ds = toDateStr(date);
-          const events = getEventsForDate(ds);
-          const isToday = ds === todayStr;
-
-          return (
-            <div
-              key={di}
-              className="flex-1 relative border-r border-[#e2e2de]"
-              style={{ minWidth: 0 }}
-            >
-              {/* Hour grid lines */}
-              {HOURS.map((h) => (
-                <div
-                  key={h}
-                  className="border-b border-[#e2e2de]"
-                  style={{ height: `${HOUR_HEIGHT}px` }}
-                />
-              ))}
-
-              {/* Today column highlight */}
-              {isToday && (
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{ background: "rgba(18,18,18,0.025)" }}
-                />
-              )}
-
-              {/* Events */}
-              {events.map((ev) => {
-                if (!ev.startTime || !ev.endTime) return null;
-                const startMin = parseTime(ev.startTime);
-                const endMin = parseTime(ev.endTime);
-                const top = (startMin / (24 * 60)) * (HOUR_HEIGHT * 24);
-                const height = Math.max(
-                  ((endMin - startMin) / (24 * 60)) * (HOUR_HEIGHT * 24),
-                  20,
-                );
-
-                return (
-                  <button
-                    key={ev.id}
-                    className="week-event absolute left-0.5 right-0.5 rounded px-1.5 py-1 bg-[#121212] text-[#f9f9f7] text-left overflow-hidden cursor-pointer transition-all"
-                    style={{
-                      top: `${top}px`,
-                      height: `${height}px`,
-                      zIndex: 2,
-                    }}
-                    onClick={() => onEventClick(ev)}
-                  >
-                    <div className="text-[10px] font-semibold truncate">
-                      {ev.title}
-                    </div>
-                    {height > 28 && (
-                      <div className="text-[9px] opacity-60 truncate">
-                        {ev.startTime} – {ev.endTime}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-
-              {/* Current time indicator */}
-              {isToday && (
-                <div
-                  className="absolute left-0 right-0 pointer-events-none"
-                  style={{ top: `${nowTop}px`, zIndex: 10 }}
-                >
-                  <div className="relative flex items-center">
-                    <div className="w-2 h-2 rounded-full bg-[#121212] -ml-1 shrink-0" />
-                    <div className="flex-1 h-px bg-[#121212]" />
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 };
