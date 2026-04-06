@@ -229,7 +229,7 @@ const AppCalendar = () => {
 
   const getEventsForDate = useCallback(
     (dateStr: string) => {
-      return [...events, ...holidays].filter((e) => {
+      return [...holidays, ...events].filter((e) => {
         if (!e.start_time) return false;
         const [y, m, d] = dateStr.split("-").map(Number);
         const eventDate = new Date(e.start_time);

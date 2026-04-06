@@ -50,9 +50,73 @@ const WeekView = ({
         })}
       </div>
 
+      <div className="relative border-b border-[#e2e2de]">
+        <div className="grid grid-cols-[56px_repeat(7,1fr)]">
+          <div />
+          {weekDates.map((_, i) => (
+            <div key={i} className="min-h-7" />
+          ))}
+        </div>
+
+        {(() => {
+          const holidayMap = new Map<
+            string,
+            { start: number; end: number; title: string; color: string }
+          >();
+
+          weekDates.forEach((date, index) => {
+            const ds = toDateStr(date);
+            const holidays = getEventsForDate(ds).filter(
+              (e) => e.category_id === "holiday",
+            );
+
+            holidays.forEach((h) => {
+              const key = h.title;
+              if (!holidayMap.has(key)) {
+                holidayMap.set(key, {
+                  start: index,
+                  end: index,
+                  title: h.title,
+                  color: h.categories?.color || "#22c55e",
+                });
+              } else {
+                holidayMap.get(key)!.end = index;
+              }
+            });
+          });
+
+          return Array.from(holidayMap.values()).map((h, i) => {
+            const colWidth = `calc((100% - 56px) / 7)`;
+
+            const left = `calc(56px + ${h.start} * ${colWidth})`;
+            const width = `calc(${h.end - h.start + 1} * ${colWidth})`;
+
+            return (
+              <div
+                key={i}
+                className="absolute top-1 px-1"
+                style={{
+                  left,
+                  width,
+                }}
+              >
+                <div
+                  className="rounded px-2 py-1 text-xs font-medium whitespace-nowrap overflow-hidden truncate"
+                  style={{
+                    backgroundColor: h.color,
+                    color: getContrastColor(h.color),
+                  }}
+                >
+                  {h.title}
+                </div>
+              </div>
+            );
+          });
+        })()}
+      </div>
+
       <div ref={scrollRef} className="flex-1 overflow-auto cal-scroll">
         <div className="flex" style={{ minWidth: 0 }}>
-          {/* Time gutter */}
           <div className="shrink-0 w-14 border-r border-[#e2e2de] relative">
             {HOURS.map((h) => (
               <div
@@ -69,10 +133,11 @@ const WeekView = ({
             ))}
           </div>
 
-          {/* Day columns */}
           {weekDates.map((date, di) => {
             const ds = toDateStr(date);
-            const events = getEventsForDate(ds);
+            const events = getEventsForDate(ds).filter(
+              (e) => e.category_id !== "holiday",
+            );
             const isToday = ds === todayStr;
 
             return (
@@ -81,7 +146,6 @@ const WeekView = ({
                 className="flex-1 relative border-r border-[#e2e2de]"
                 style={{ height: `${HOUR_HEIGHT * 24}px` }}
               >
-                {/* Hour grid lines */}
                 <div
                   className="absolute inset-0"
                   style={{ height: `${HOUR_HEIGHT * 24}px` }}
@@ -95,7 +159,6 @@ const WeekView = ({
                   ))}
                 </div>
 
-                {/* Today column highlight */}
                 {isToday && (
                   <div
                     className="absolute inset-0 pointer-events-none"
@@ -103,7 +166,6 @@ const WeekView = ({
                   />
                 )}
 
-                {/* Events */}
                 {events.map((ev) => {
                   if (!ev.start_time || !ev.end_time) return null;
                   const start = new Date(ev.start_time);
@@ -120,14 +182,14 @@ const WeekView = ({
                   return (
                     <button
                       key={ev.id}
-                      className="flex flex-col flex-start absolute left-0.5 right-0.5 rounded px-1.5 py-2 text-[#f9f9f7] text-left overflow-hidden cursor-pointer transition-all"
+                      className="flex flex-col flex-start absolute left-0.5 right-0.5 rounded px-1.5 py-2 text-left overflow-hidden cursor-pointer transition-all"
                       style={{
                         top: `${top}px`,
                         height: `${height}px`,
                         zIndex: 2,
                         backgroundColor: ev.categories?.color || "#121212",
                         color: ev.categories?.color
-                          ? getContrastColor(ev.categories?.color)
+                          ? getContrastColor(ev.categories.color)
                           : "#ffffff",
                       }}
                       onClick={() => onEventClick(ev)}
@@ -152,7 +214,6 @@ const WeekView = ({
                   );
                 })}
 
-                {/* Current time indicator */}
                 {isToday && (
                   <div
                     className="absolute left-0 right-0 pointer-events-none"
