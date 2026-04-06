@@ -18,6 +18,19 @@ export type CalendarEvent = {
   recurrence_start_date: string | null;
   recurrence_end_date: string | null;
   created_at: string;
+  original_date?: string;
+};
+
+export type EventException = {
+  id: string;
+  event_id: string;
+  original_date: string;
+  is_deleted: boolean;
+  override_start_time: string | null;
+  override_end_time: string | null;
+  override_title: string | null;
+  override_category_id: string | null;
+  created_at: string;
 };
 
 export const MONTH_NAMES = [
@@ -93,39 +106,66 @@ export function expandEventInRange(
   event: CalendarEvent,
   rangeStart: Date,
   rangeEnd: Date,
+  exceptions: EventException[] = [],
 ): CalendarEvent[] {
   if (!event.start_time) return [];
 
-  if (!event.is_recurring || !event.recurrence_rule) {
-    const start = new Date(event.start_time);
+  const exceptionMap = new Map<string, EventException>();
+  for (const ex of exceptions) {
+    if (ex.event_id === event.id) {
+      exceptionMap.set(ex.original_date, ex);
+    }
+  }
 
-    if (start >= rangeStart && start <= rangeEnd) {
+  if (!event.is_recurring || !event.recurrence_rule) {
+    const startUTC = new Date(event.start_time);
+    if (startUTC >= rangeStart && startUTC <= rangeEnd) {
       return [event];
     }
-
     return [];
   }
 
   try {
-    const dtstart = new Date(event.start_time)
-      .toISOString()
-      .replace(/[-:]|\.\d{3}/g, "");
+    const startUTC = new Date(event.start_time);
+    const endUTC = new Date(event.end_time);
+    const duration = endUTC.getTime() - startUTC.getTime();
 
-    const fullRule = `DTSTART:${dtstart}\n${event.recurrence_rule}`;
+    const dtstartLocal = event.recurrence_start_date
+      ? new Date(event.recurrence_start_date)
+      : startUTC;
 
-    const rule = rrulestr(fullRule);
+    const rule = rrulestr(event.recurrence_rule, { dtstart: dtstartLocal });
 
     const dates = rule.between(rangeStart, rangeEnd, true);
 
-    const originalStart = new Date(event.start_time);
-    const originalEnd = new Date(event.end_time);
-    const duration = originalEnd.getTime() - originalStart.getTime();
+    const results = dates.flatMap((dateLocal) => {
+      const dateStr = toDateStr(dateLocal); // YYYY-MM-DD in local time
+      const exception = exceptionMap.get(dateStr);
 
-    return dates.map((date) => ({
-      ...event,
-      start_time: new Date(date).toISOString(),
-      end_time: new Date(date.getTime() + duration).toISOString(),
-    }));
+      if (exception?.is_deleted) return [];
+
+      // Apply exception overrides if available, else default
+      const startTime = exception?.override_start_time
+        ? new Date(exception.override_start_time).toISOString()
+        : new Date(dateLocal.getTime()).toISOString();
+
+      const endTime = exception?.override_end_time
+        ? new Date(exception.override_end_time).toISOString()
+        : new Date(dateLocal.getTime() + duration).toISOString();
+
+      return [
+        {
+          ...event,
+          title: exception?.override_title ?? event.title,
+          category_id: exception?.override_category_id ?? event.category_id,
+          start_time: startTime,
+          end_time: endTime,
+          original_date: dateStr,
+        },
+      ];
+    });
+
+    return results;
   } catch (err) {
     console.error("Failed to parse recurrence rule:", err);
     return [];

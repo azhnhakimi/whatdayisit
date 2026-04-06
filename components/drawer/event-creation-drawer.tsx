@@ -112,9 +112,19 @@ const EventCreationDrawer = ({ onEventCreated }: Props) => {
       options.byweekday = selectedDays.map((d) => DAY_MAP[d]);
     }
 
-    if (recurrenceEnd) options.until = recurrenceEnd;
+    if (recurrenceEnd) {
+      const until = new Date(recurrenceEnd);
+      until.setHours(23, 59, 59, 999);
+      options.until = until;
+    }
 
-    return new RRule(options).toString();
+    const rule = new RRule(options);
+
+    return rule
+      .toString()
+      .split("\n")
+      .filter((line) => !line.startsWith("DTSTART"))
+      .join("\n");
   };
 
   const handleSubmit = async () => {
@@ -143,12 +153,12 @@ const EventCreationDrawer = ({ onEventCreated }: Props) => {
           category_id: selectedCategory || null,
           title,
           description: description || null,
-          start_time: startDateTime?.toISOString() || null,
-          end_time: endDateTime?.toISOString() || null,
+          start_time: startDateTime?.toISOString(),
+          end_time: endDateTime?.toISOString(),
           is_recurring: isRecurring,
           recurrence_rule: buildRRule(),
-          recurrence_start_date: startDateTime?.toISOString() || null,
-          recurrence_end_date: recurrenceEnd?.toISOString() || null,
+          recurrence_start_date: startDateTime,
+          recurrence_end_date: recurrenceEnd,
         })
         .select()
         .single();

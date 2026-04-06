@@ -14,21 +14,18 @@ import {
   DAY_NAMES_SHORT,
   HOURS,
   expandEventInRange,
+  type EventException,
 } from "@/data/calendar";
 import MonthView from "@/components/month-view";
 import WeekView from "@/components/week-view";
 import EventCreationDrawer from "@/components/drawer/event-creation-drawer";
+import EventUpdateDrawer from "@/components/drawer/event-update-drawer";
 
 type ViewMode = "month" | "week";
 
 function onDayClick(date: Date) {
   // TODO: open day detail drawer
   console.log("Day clicked:", toDateStr(date));
-}
-
-function onEventClick(event: CalendarEvent) {
-  // TODO: open event detail drawer
-  console.log("Event clicked:", event);
 }
 
 const AppCalendar = () => {
@@ -42,6 +39,12 @@ const AppCalendar = () => {
   const [anchor, setAnchor] = useState<Date>(new Date(today));
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const weekScrollRef = useRef<HTMLDivElement>(null);
+
+  const [exceptions, setExceptions] = useState<EventException[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
+    null,
+  );
+  const [updateDrawerOpen, setUpdateDrawerOpen] = useState(false);
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -100,10 +103,21 @@ const AppCalendar = () => {
       return;
     }
 
+    const { data: exData } = await supabase
+      .from("event_exceptions")
+      .select("*")
+      .in(
+        "event_id",
+        (data ?? []).map((e) => e.id),
+      );
+
+    setExceptions(exData ?? []);
+
     if (data) {
       const expanded = data.flatMap((event) =>
-        expandEventInRange(event, start, end),
+        expandEventInRange(event, start, end, exData ?? []),
       );
+      console.log(expanded);
 
       setEvents(expanded);
     }
@@ -130,6 +144,11 @@ const AppCalendar = () => {
     }
   }, [viewMode]);
 
+  function onEventClick(event: CalendarEvent) {
+    setSelectedEvent(event);
+    setUpdateDrawerOpen(true);
+  }
+
   const goNext = () => {
     const d = new Date(anchor);
     if (viewMode === "month") d.setMonth(d.getMonth() + 1);
@@ -154,7 +173,14 @@ const AppCalendar = () => {
         if (!e.start_time) return false;
 
         const eventDate = new Date(e.start_time);
-        return toDateStr(eventDate) === dateStr;
+
+        // Compare using local year/month/day
+        const [y, m, d] = dateStr.split("-").map(Number);
+        return (
+          eventDate.getFullYear() === y &&
+          eventDate.getMonth() === m - 1 &&
+          eventDate.getDate() === d
+        );
       });
     },
     [events],
@@ -237,6 +263,19 @@ const AppCalendar = () => {
           </div>
 
           <EventCreationDrawer onEventCreated={fetchEvents} />
+          <EventUpdateDrawer
+            open={updateDrawerOpen}
+            onOpenChange={setUpdateDrawerOpen}
+            event={selectedEvent}
+            onEventUpdated={() => {
+              fetchEvents();
+              setUpdateDrawerOpen(false);
+            }}
+            onEventDeleted={() => {
+              fetchEvents();
+              setUpdateDrawerOpen(false);
+            }}
+          />
         </div>
       </div>
 
