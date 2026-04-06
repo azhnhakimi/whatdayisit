@@ -1,25 +1,26 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 import {
   type CalendarEvent,
   toDateStr,
-  parseTime,
   getWeekDates,
   getMonthGrid,
   MONTH_NAMES,
-  DAY_NAMES_SHORT,
-  HOURS,
   expandEventInRange,
   type EventException,
+  fetchMalaysiaHolidays,
 } from "@/data/calendar";
 import MonthView from "@/components/month-view";
 import WeekView from "@/components/week-view";
 import EventCreationDrawer from "@/components/drawer/event-creation-drawer";
 import EventUpdateDrawer from "@/components/drawer/event-update-drawer";
+import HolidayDetailsDrawer from "@/components/drawer/holiday-details-drawer";
 
 type ViewMode = "month" | "week";
 
@@ -45,6 +46,9 @@ const AppCalendar = () => {
     null,
   );
   const [updateDrawerOpen, setUpdateDrawerOpen] = useState(false);
+  const [holidayDrawerOpen, setHolidayDrawerOpen] = useState(false);
+  const [isPublicHolidayVisible, setIsPublicHolidayVisible] = useState(false);
+  const [holidays, setHolidays] = useState<CalendarEvent[]>([]);
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -117,8 +121,6 @@ const AppCalendar = () => {
       const expanded = data.flatMap((event) =>
         expandEventInRange(event, start, end, exData ?? []),
       );
-      console.log(expanded);
-
       setEvents(expanded);
     }
 
@@ -135,6 +137,60 @@ const AppCalendar = () => {
   }, []);
 
   useEffect(() => {
+    const fetchHolidays = async () => {
+      if (!isPublicHolidayVisible) {
+        setHolidays([]);
+        return;
+      }
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error("Failed to get user:", userError);
+        setHolidays([]);
+        return;
+      }
+
+      try {
+        const year = anchor.getFullYear();
+        const { data, error } = await fetchMalaysiaHolidays(year);
+
+        if (error || !data) {
+          console.error("Failed to fetch holidays:", error);
+          setHolidays([]);
+          return;
+        }
+
+        const holidayEvents: CalendarEvent[] = data.map((h) => ({
+          id: `holiday-${h.date}-${h.name}`,
+          user_id: user.id,
+          title: h.name,
+          description: `Malaysia Public Holiday – ${h.state}`,
+          start_time: h.date,
+          end_time: h.date,
+          is_recurring: false,
+          category_id: "holiday",
+          categories: { id: "holiday", name: "Holiday", color: "#eab8fd " },
+          recurrence_rule: null,
+          recurrence_start_date: null,
+          recurrence_end_date: null,
+          created_at: new Date().toISOString(),
+        }));
+
+        setHolidays(holidayEvents);
+      } catch (err) {
+        console.error(err);
+        setHolidays([]);
+      }
+    };
+
+    fetchHolidays();
+  }, [isPublicHolidayVisible, anchor]);
+
+  useEffect(() => {
     if (viewMode === "week" && weekScrollRef.current) {
       const now = new Date();
       const minutes = now.getHours() * 60 + now.getMinutes();
@@ -146,7 +202,11 @@ const AppCalendar = () => {
 
   function onEventClick(event: CalendarEvent) {
     setSelectedEvent(event);
-    setUpdateDrawerOpen(true);
+    if (event.category_id === "holiday") {
+      setHolidayDrawerOpen(true);
+    } else {
+      setUpdateDrawerOpen(true);
+    }
   }
 
   const goNext = () => {
@@ -169,13 +229,10 @@ const AppCalendar = () => {
 
   const getEventsForDate = useCallback(
     (dateStr: string) => {
-      return events.filter((e) => {
+      return [...events, ...holidays].filter((e) => {
         if (!e.start_time) return false;
-
-        const eventDate = new Date(e.start_time);
-
-        // Compare using local year/month/day
         const [y, m, d] = dateStr.split("-").map(Number);
+        const eventDate = new Date(e.start_time);
         return (
           eventDate.getFullYear() === y &&
           eventDate.getMonth() === m - 1 &&
@@ -183,7 +240,7 @@ const AppCalendar = () => {
         );
       });
     },
-    [events],
+    [events, holidays],
   );
 
   const headerLabel = () => {
@@ -247,6 +304,14 @@ const AppCalendar = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <Label>Toggle Malaysia Holidays</Label>
+            <Switch
+              checked={isPublicHolidayVisible}
+              onCheckedChange={setIsPublicHolidayVisible}
+            />
+          </div>
+
           <div className="flex rounded-md overflow-hidden border border-[#e2e2de]">
             <button
               onClick={() => setViewMode("month")}
@@ -275,6 +340,11 @@ const AppCalendar = () => {
               fetchEvents();
               setUpdateDrawerOpen(false);
             }}
+          />
+          <HolidayDetailsDrawer
+            open={holidayDrawerOpen}
+            onOpenChange={setHolidayDrawerOpen}
+            event={selectedEvent}
           />
         </div>
       </div>

@@ -33,6 +33,17 @@ export type EventException = {
   created_at: string;
 };
 
+export type Holiday = {
+  date: string;
+  name: string;
+  state: string;
+};
+
+export type FetchResult = {
+  data: Holiday[] | null;
+  error: string | null;
+};
+
 export const MONTH_NAMES = [
   "January",
   "February",
@@ -139,12 +150,11 @@ export function expandEventInRange(
     const dates = rule.between(rangeStart, rangeEnd, true);
 
     const results = dates.flatMap((dateLocal) => {
-      const dateStr = toDateStr(dateLocal); // YYYY-MM-DD in local time
+      const dateStr = toDateStr(dateLocal);
       const exception = exceptionMap.get(dateStr);
 
       if (exception?.is_deleted) return [];
 
-      // Apply exception overrides if available, else default
       const startTime = exception?.override_start_time
         ? new Date(exception.override_start_time).toISOString()
         : new Date(dateLocal.getTime()).toISOString();
@@ -169,5 +179,59 @@ export function expandEventInRange(
   } catch (err) {
     console.error("Failed to parse recurrence rule:", err);
     return [];
+  }
+}
+
+export async function fetchMalaysiaHolidays(
+  year: number,
+): Promise<FetchResult> {
+  const baseUrl = "https://sabah-holiday.dydxsoft.my/api";
+
+  try {
+    // fetch states
+    const statesRes = await fetch(`${baseUrl}/states.json`);
+    if (!statesRes.ok) throw new Error("Failed to fetch states");
+    const states: { code: string; name: string }[] = await statesRes.json();
+
+    const holidaysByState = await Promise.all(
+      states.map(async (state) => {
+        const res = await fetch(`${baseUrl}/${state.code}/${year}.json`);
+        if (!res.ok) return [];
+        const data: { date: string; holiday_name: string }[] = await res.json();
+
+        return data
+          .map((h) => {
+            // Convert "Feb 17" + year → ISO string
+            const date = new Date(`${h.date} ${year}`);
+            if (isNaN(date.getTime())) return null;
+
+            return {
+              date: date.toISOString(), // ISO string
+              name: h.holiday_name,
+              state: state.name,
+            };
+          })
+          .filter(
+            (h): h is { date: string; name: string; state: string } =>
+              h !== null,
+          );
+      }),
+    );
+
+    const allHolidays = holidaysByState.flat();
+
+    // remove duplicates
+    const uniqueMap = new Map<
+      string,
+      { date: string; name: string; state: string }
+    >();
+    allHolidays.forEach((h) => {
+      const key = `${h.date}|${h.name}`;
+      if (!uniqueMap.has(key)) uniqueMap.set(key, h);
+    });
+
+    return { data: Array.from(uniqueMap.values()), error: null };
+  } catch (err: any) {
+    return { data: null, error: err.message || "Unknown error" };
   }
 }

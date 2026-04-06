@@ -1,13 +1,10 @@
 import {
   type CalendarEvent,
   toDateStr,
-  parseTime,
-  getWeekDates,
   getMonthGrid,
-  MONTH_NAMES,
   DAY_NAMES_SHORT,
-  HOURS,
 } from "@/data/calendar";
+import { getContrastColor } from "@/lib/utils";
 
 type MonthViewProps = {
   anchor: Date;
@@ -84,9 +81,12 @@ const MonthView = ({
                       {events.slice(0, 3).map((ev) => (
                         <button
                           key={ev.id}
-                          className="text-xs w-full text-left px-1.5 py-2 rounded font-medium text-[#f9f9f7] truncate transition-all cursor-pointer"
+                          className="text-xs w-full text-left px-1.5 py-2 rounded font-medium truncate transition-all cursor-pointer"
                           style={{
                             backgroundColor: ev.categories?.color || "#121212",
+                            color: ev.categories?.color
+                              ? getContrastColor(ev.categories?.color)
+                              : "#ffffff",
                           }}
                           onClick={(e) => {
                             e.stopPropagation();

@@ -1,13 +1,11 @@
 import {
   type CalendarEvent,
   toDateStr,
-  parseTime,
   getWeekDates,
-  getMonthGrid,
-  MONTH_NAMES,
   DAY_NAMES_SHORT,
   HOURS,
 } from "@/data/calendar";
+import { getContrastColor } from "@/lib/utils";
 
 type WeekViewProps = {
   anchor: Date;
@@ -128,6 +126,9 @@ const WeekView = ({
                         height: `${height}px`,
                         zIndex: 2,
                         backgroundColor: ev.categories?.color || "#121212",
+                        color: ev.categories?.color
+                          ? getContrastColor(ev.categories?.color)
+                          : "#ffffff",
                       }}
                       onClick={() => onEventClick(ev)}
                     >
