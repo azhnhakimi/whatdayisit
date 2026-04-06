@@ -145,7 +145,7 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={isActive(item.href)}
-                      className="border border-transparent py-5 px-4 data-[active=true]:bg-white data-[active=true]:text-black data-[active=true]:border data-[active=true]:border-(--primary-blue)/20 hover:bg-white hover:text-black hover:border hover:border-white/20 active:bg-white active:text-black focus:bg-white focus-visible:bg-transparent focus-visible:ring-0 transition-all duration-200 ease-in-out"
+                      className="border border-transparent py-5 px-4 data-[active=true]:bg-white data-[active=true]:text-black data-[active=true]:border data-[active=true]:border-(--primary-blue)/20 hover:bg-white hover:text-black hover:border hover:border-white/20 active:bg-white active:text-black focus:bg-white focus:text-black focus:border focus:border-white/20-visible:bg-transparent focus-visible:ring-0 transition-all duration-200 ease-in-out"
                     >
                       <Link
                         href={item.href}

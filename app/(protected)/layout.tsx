@@ -45,7 +45,7 @@ export default function ProtectedLayout({ children }: ProtectedLayoutProps) {
   return (
     <SidebarProvider>
       <AppSidebar />
-      {children}
+      <main className="min-h-screen h-full w-full flex-1">{children}</main>
     </SidebarProvider>
   );
 }
