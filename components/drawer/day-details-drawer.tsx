@@ -7,11 +7,13 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { type CalendarEvent } from "@/data/calendar";
+import { getContrastColor } from "@/lib/utils";
 
-type HolidayDetailsDrawerProps = {
+type DayDetailsDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  event: CalendarEvent | null;
+  events: CalendarEvent[] | [];
+  date?: Date;
 };
 
 function formatPrettyDate(iso?: string): string {
@@ -39,37 +41,44 @@ function formatPrettyDate(iso?: string): string {
   return `${day}${getOrdinal(day)} ${month} ${year}`;
 }
 
-const HolidayDetailsDrawer = ({
+const DayDetailsDrawer = ({
   open,
   onOpenChange,
-  event,
-}: HolidayDetailsDrawerProps) => {
+  events,
+  date,
+}: DayDetailsDrawerProps) => {
   return (
     <Drawer direction="right" open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="p-6 space-y-6">
         <DrawerHeader className="p-0">
-          <DrawerTitle className="text-lg">Holiday Details</DrawerTitle>
+          <DrawerTitle className="text-lg">
+            Events on {formatPrettyDate(date?.toISOString())}
+          </DrawerTitle>
         </DrawerHeader>
 
-        <div className="space-y-4">
-          <div className="rounded-md border border-slate-400 bg-[#f9f9f7] p-2">
-            <p>Date</p>
-            <p className="text-lg font-semibold">
-              {formatPrettyDate(event?.start_time)}
-            </p>
-          </div>
-          <div className="rounded-md border border-slate-400 bg-[#f9f9f7] p-2">
-            <p>Holiday Name</p>
-            <p className="text-lg font-semibold">{event?.title}</p>
-          </div>
-          <div className="rounded-md border border-slate-400 bg-[#f9f9f7] p-2">
-            <p>Description</p>
-            <p className="text-lg font-semibold">{event?.description}</p>
-          </div>
+        {events.length === 0 && (
+          <p className="text-slate-400">No events on this day.</p>
+        )}
+
+        <div className="space-y-6">
+          {events.map((event, index) => (
+            <div
+              key={index}
+              className="border border-slate-400 bg-[#f9f9f7] rounded-md p-2"
+              style={{
+                backgroundColor: event.categories?.color || "#121212",
+                color: event.categories?.color
+                  ? getContrastColor(event.categories?.color)
+                  : "#ffffff",
+              }}
+            >
+              <p>{event.title}</p>
+            </div>
+          ))}
         </div>
       </DrawerContent>
     </Drawer>
   );
 };
 
-export default HolidayDetailsDrawer;
+export default DayDetailsDrawer;

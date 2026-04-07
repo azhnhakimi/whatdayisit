@@ -21,13 +21,9 @@ import WeekView from "@/components/week-view";
 import EventCreationDrawer from "@/components/drawer/event-creation-drawer";
 import EventUpdateDrawer from "@/components/drawer/event-update-drawer";
 import HolidayDetailsDrawer from "@/components/drawer/holiday-details-drawer";
+import DayDetailsDrawer from "@/components/drawer/day-details-drawer";
 
 type ViewMode = "month" | "week";
-
-function onDayClick(date: Date) {
-  // TODO: open day detail drawer
-  console.log("Day clicked:", toDateStr(date));
-}
 
 const AppCalendar = () => {
   const supabase = createClient();
@@ -45,6 +41,9 @@ const AppCalendar = () => {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
   );
+  const [dayEvents, setDayEvents] = useState<CalendarEvent[]>([]);
+  const [dayDate, setDayDate] = useState<Date>();
+  const [dayDetailsOpen, setDayDetailsOpen] = useState(false);
   const [updateDrawerOpen, setUpdateDrawerOpen] = useState(false);
   const [holidayDrawerOpen, setHolidayDrawerOpen] = useState(false);
   const [isPublicHolidayVisible, setIsPublicHolidayVisible] = useState(false);
@@ -200,6 +199,13 @@ const AppCalendar = () => {
     }
   }, [viewMode]);
 
+  function onDayClick(date: Date) {
+    const events = getEventsForDate(toDateStr(date));
+    setDayEvents(events);
+    setDayDate(date);
+    setDayDetailsOpen(true);
+  }
+
   function onEventClick(event: CalendarEvent) {
     setSelectedEvent(event);
     if (event.category_id === "holiday") {
@@ -345,6 +351,12 @@ const AppCalendar = () => {
             open={holidayDrawerOpen}
             onOpenChange={setHolidayDrawerOpen}
             event={selectedEvent}
+          />
+          <DayDetailsDrawer
+            open={dayDetailsOpen}
+            onOpenChange={setDayDetailsOpen}
+            events={dayEvents}
+            date={dayDate}
           />
         </div>
       </div>
