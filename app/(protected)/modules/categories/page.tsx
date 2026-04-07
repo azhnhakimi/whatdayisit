@@ -1,6 +1,11 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import type { Metadata } from "next";
 import CategoryTable from "@/components/category/category-table";
+
+export const metadata: Metadata = {
+  title: "Categories",
+};
 
 const CategoriesPage = async () => {
   const cookieStore = await cookies();

@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import AppCalendar from "@/components/app-calendar";
+
+export const metadata: Metadata = {
+  title: "Calendar",
+};
 
 const CalendarPage = () => {
   return (
